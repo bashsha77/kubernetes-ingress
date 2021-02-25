@@ -30,7 +30,8 @@ func (tsEx *TransportServerEx) String() string {
 }
 
 // generateTransportServerConfig generates a full configuration for a TransportServer.
-func generateTransportServerConfig(transportServerEx *TransportServerEx, listenerPort int, isPlus bool) version2.TransportServerConfig {
+func generateTransportServerConfig(transportServerEx *TransportServerEx, listenerPort int, isPlus bool, snippetsEnabled bool) (version2.TransportServerConfig, Warnings) {
+	warn := newWarnings()
 	upstreamNamer := newUpstreamNamerForTransportServer(transportServerEx.TransportServer)
 
 	upstreams := generateStreamUpstreams(transportServerEx, upstreamNamer, isPlus)
@@ -59,14 +60,17 @@ func generateTransportServerConfig(transportServerEx *TransportServerEx, listene
 		proxyTimeout = transportServerEx.TransportServer.Spec.SessionParameters.Timeout
 	}
 
-	statusZone := ""
-	if transportServerEx.TransportServer.Spec.Listener.Name == conf_v1alpha1.TLSPassthroughListenerName {
-		statusZone = transportServerEx.TransportServer.Spec.Host
-	} else {
-		statusZone = transportServerEx.TransportServer.Spec.Listener.Name
+	serverSnippets := generateSnippets(snippetsEnabled, transportServerEx.TransportServer.Spec.Snippets, []string{})
+	if !snippetsEnabled && (transportServerEx.TransportServer.Spec.Snippets != "") {
+		warn.AddWarning(transportServerEx.TransportServer, "snippet specified but snippets feature is not enabled")
 	}
 
-	return version2.TransportServerConfig{
+	statusZone := transportServerEx.TransportServer.Spec.Listener.Name
+	if transportServerEx.TransportServer.Spec.Listener.Name == conf_v1alpha1.TLSPassthroughListenerName {
+		statusZone = transportServerEx.TransportServer.Spec.Host
+	}
+
+	tsConfig := version2.TransportServerConfig{
 		Server: version2.StreamServer{
 			TLSPassthrough:           transportServerEx.TransportServer.Spec.Listener.Name == conf_v1alpha1.TLSPassthroughListenerName,
 			UnixSocket:               generateUnixSocket(transportServerEx),
@@ -84,9 +88,12 @@ func generateTransportServerConfig(transportServerEx *TransportServerEx, listene
 			ProxyNextUpstreamTimeout: generateTime(nextUpstreamTimeout, "0"),
 			ProxyNextUpstreamTries:   nextUpstreamTries,
 			HealthCheck:              healthCheck,
+			Snippets:                 serverSnippets,
 		},
 		Upstreams: upstreams,
 	}
+
+	return tsConfig, warn
 }
 
 func generateUnixSocket(transportServerEx *TransportServerEx) string {

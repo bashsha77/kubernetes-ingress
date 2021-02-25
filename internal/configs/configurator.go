@@ -557,7 +557,7 @@ func (cnf *Configurator) AddOrUpdateTransportServer(transportServerEx *Transport
 func (cnf *Configurator) addOrUpdateTransportServer(transportServerEx *TransportServerEx) error {
 	name := getFileNameForTransportServer(transportServerEx.TransportServer)
 
-	tsCfg := generateTransportServerConfig(transportServerEx, transportServerEx.ListenerPort, cnf.isPlus)
+	tsCfg, _ := generateTransportServerConfig(transportServerEx, transportServerEx.ListenerPort, cnf.isPlus, cnf.staticCfgParams.EnableSnippets)
 
 	content, err := cnf.templateExecutorV2.ExecuteTransportServerTemplate(&tsCfg)
 	if err != nil {
@@ -1073,6 +1073,7 @@ func (cnf *Configurator) UpdateConfig(cfgParams *ConfigParams, ingExes []*Ingres
 	return allWarnings, nil
 }
 
+// UpdateTransportServers updates TransportServers.
 func (cnf *Configurator) UpdateTransportServers(updatedTSExes []*TransportServerEx, deletedKeys []string) error {
 	for _, tsEx := range updatedTSExes {
 		err := cnf.addOrUpdateTransportServer(tsEx)
